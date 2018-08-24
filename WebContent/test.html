@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+</head>
+<script type="text/javascript" src="/Yplat/resource/js/jquery.min.js"></script>
+<script type="text/javascript" src="/Yplat/resource/js/msgTool.js?v=1"></script>
+<script type="text/javascript" src="/Yplat/resource/encrypt/aes.js"></script>
+<script type="text/javascript" src="/Yplat/resource/encrypt/rsa.js"></script>
+<body>
+
+<button onclick="queding()">get url连接提交</button>
+
+</br>
+<form id="form" action="/Yplat/api" method="post">
+<input type="text" name="data" id="data" value=""/>
+<input type="submit" value="表单提交">
+</form>
+
+</br>
+
+
+<button onclick="ajaxTijiao()">ajax提交</button>
+</br>
+
+<input id="code" value="" />
+<input id="msg" value="" />
+<input id="jiami" value="0" />
+<button onclick="tests()">ajax提交</button>
+</br>
+
+<textarea rows="20" cols="50" id="reqStr"></textarea>
+<button>加载报文</button>
+<button>明文请求</button>
+<button>密文请求</button>
+<textarea rows="20" cols="50" id="rspStr"></textarea>
+
+<script type="text/javascript">
+	var _url = "http://127.0.0.1:8080/Yplat/api";
+	
+	var json1 = {
+			head:{bussCode:"addGoods"},
+			body:{goodsName:"1书2",goodsId:"11"}
+			};
+	var str1 = JSON.stringify(json1);
+	$("#data").val(str1);
+	
+    function queding() {
+    	var json = {
+    			head:{bussCode:"addGoods"},
+    			body:{goodsName:"1的2",goodsId:"11得到"}
+    			};
+    	var str = JSON.stringify(json);
+		window.location.href = encodeURI("http://127.0.0.1:8080/Yplat/api?data="+str);
+	}
+    var path = "http://127.0.0.1:8080/Yplat";
+    var msg = new msgTool();
+    function ajaxTijiao() {
+    	msg.sendMsg('/api',{userName:'czs',password:'123456',phoneNo:'18892872738'},'userLogin',function(data){
+    		sessionStorage.setItem("rsaKey",data.body.rsaKey);
+    	},function(data){
+    		
+    	});
+	}
+    
+    function tests(){
+    	var jiami = $("#jiami").val();
+    	var json = $("#msg").val();
+    	var code = $("#code").val();
+    	if(jiami == "0"){
+    		msg.sendMsg('/api',JSON.parse(json),code,function(data){
+        		
+        	},function(data){
+        		
+        	});
+    	}else{
+    		msg.sendEncryptMsg('/api',JSON.parse(json),code,function(data){
+        		console.log(data);
+        	},function(data){
+        		console.log(data);
+        	});
+    	}
+    }
+</script>
+</body>
+</html>
