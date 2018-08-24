@@ -31,3 +31,19 @@ json格式都包括head和body两部分，
 
 获取请求参数中的bussCode，并根据bussCode的值在map中找到对应的执行方法，在把请求json的body中的参数赋值到成执行方法入参model中，然后映射的方法的处理逻辑由开发人员完成，执行完方法后，获取到返回的model数据，并生成响应。现在可以根据@ApiMapping中outPutType的参数指定返回到前端的是json还是html，目前html是有freemarker模板引擎实现的。
 
+此外为了提高本系统的吞吐量和并发量，采用了servlet3的异步并配合线程池来处理请求。
+
+项目结构目录
+Yplat.annotation  ----- 项目使用的注解
+Yplat.apidoc      ----- api文档处理
+Yplat.cache       ----- 项目缓存
+Yplat.common      ----- 公共的类
+Yplat.configManager --- 配置文件加载
+Yplat.core        ----- 项目的核心的几个处理类
+Yplat.exception   ----- 异常封装的类
+Yplat.freemarker  ----- freemarker自定义标签
+Yplat.model       ----- 请求和响应等model封装
+Yplat.session     ----- 会话的实现，现主要分redis和httpSession两种方式储存会话，前者适用于线上多个工程部署实现会话共享
+Yplat.util        ----- 封装一些工具类
+
+最后，笔者深知此平台在功能的代码实现以及扩展方面还有诸多不足之处，希望大家能一起参与并补充，使之变得更加完善。
