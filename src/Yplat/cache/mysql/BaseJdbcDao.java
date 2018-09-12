@@ -89,6 +89,18 @@ public class BaseJdbcDao<T> {
 		}
         return this.jdbcTemplate.query(sql, rowMapper, args.toArray());
     }
+    
+    /**
+     * 把sql查询处理的结果映射到 class1 对应的对象里面去
+     */
+    public List<?> queryTList(String sql, List<Object> args,Class<?> class1) {
+    	RowMapper<?> rowMapper = BeanPropertyRowMapper.newInstance(class1);
+    	log.info("=======数据库查询语句：{}=========",sql);
+    	if (args != null) {
+    		log.info("=======数据库查询参数：{}=========",args.toString());
+		}
+        return this.jdbcTemplate.query(sql, rowMapper, args.toArray());
+    }
 
     /**
      * <B>方法名称：</B>查询JSON数据<BR>

@@ -49,6 +49,17 @@ public class CacheDataAop {
 		Object[] args = joinPoint.getArgs();
 		try {
 			synchronized (this) {
+				String value2 = redisConnection.getValue(key);
+				if (StringUtils.isNotEmpty(value2)) {
+					if (cacheData.addCache()) {
+						logging.info("###########方法{},命中了缓存############",method.getDeclaringClass().getName()+"."+method.getName());
+						result = JSON.parse(value2);
+						return result;
+					}else {
+						logging.info("###########方法{},虽然命中了缓存,但需要删除该缓存############",method.getDeclaringClass().getName()+"."+method.getName());
+						redisConnection.delValue(key);
+					}
+				}
 				result = joinPoint.proceed(args);
 				if (cacheData.addCache()) {
 					logging.info("###########方法{},未命中缓存，将查询的结果存入缓存############",method.getDeclaringClass().getName()+"."+method.getName());
