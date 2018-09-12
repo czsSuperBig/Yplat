@@ -8,7 +8,6 @@ import org.apache.commons.beanutils.PropertyUtilsBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.r2d2.api.service.Goods;
 
 public class ReflectUtil {
 
@@ -51,14 +50,5 @@ public class ReflectUtil {
         return target;
     }
  
-    public static void main(String[] args) {
-        Goods goods = new Goods();
-        goods.setGoodsId("123");
-        goods.setGoodsName("会话");
-        Map<String, Object> addProperties = new HashMap<>();
-        addProperties.put("day31", "你好");
-        Goods newVo = (Goods) getTarget(goods, addProperties);
-        System.out.println(newVo.toString());
-    }
 
 }

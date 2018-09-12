@@ -39,7 +39,7 @@
     <logger level="INFO" name="org.apache"/>
 
 
-    <root  level="DEBUG" name="com.r2d2">
+    <root  level="DEBUG" name="com.api">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

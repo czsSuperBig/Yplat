@@ -149,5 +149,11 @@ public class FastDfsUtil {
         return -1;
     }
 
+    public static void main(String[] args) {
+		//System.out.println(uploadFile(new File("C:\\Users\\chen7\\Desktop\\veer-142464656.jpg"), "pic"));
+    	//downloadFile("group1/M00/00/00/wKgBBVuTl7qAV3MzAAD5PtWI_Ag060.pic", new File("C:\\Users\\chen7\\Desktop\\111.jpg"));
+    	//System.out.println(getFileMetadata("group1/M00/00/00/wKgBBVuTl7qAV3MzAAD5PtWI_Ag060.pic").toString());
+    	System.out.println(deleteFile("group1/M00/00/00/wKgBBVuTmnmADQVXAAD5PtWI_Ag716.pic"));
+	}
 }
 

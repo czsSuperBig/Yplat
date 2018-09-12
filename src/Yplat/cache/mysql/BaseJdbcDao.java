@@ -1,29 +1,26 @@
 package Yplat.cache.mysql;
 
+import java.lang.reflect.ParameterizedType;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.UUID;
-
-import javax.sql.DataSource;
-
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.time.DateFormatUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
-
+import org.springframework.jdbc.core.RowMapper;
 
 import com.alibaba.fastjson.JSONObject;
 
-import Yplat.common.Const;
+import Yplat.cache.mysql.bean.Page;
 
 /**
  * <B>系统名称：</B>通用系统功能<BR>
@@ -35,31 +32,26 @@ import Yplat.common.Const;
  * @since 2013-10-28
  */
 
-public class BaseJdbcDao {
+public class BaseJdbcDao<T> {
+	
+	private static final Logger log = LoggerFactory.getLogger(BaseJdbcDao.class);
 
     /** JSON数据行映射器 */
     private static final JsonRowMapper JSON_ROW_MAPPER = new JsonRowMapper();
 
     /** JDBC调用模板 */
-    private JdbcTemplate jdbcTemplate;
-
-    /** 启动时间 */
-    private static Date startTime;
-
-    /**
-     * <B>方法名称：</B>初始化JDBC调用模板<BR>
-     * <B>概要说明：</B><BR>
-     * 
-     * @param dataSource 数据源
-     */
     @Autowired
-    public void initJdbcTemplate(DataSource dataSource) {
-        this.jdbcTemplate = new JdbcTemplate(dataSource);
-        if (startTime == null) {
-            startTime = getCurrentTime();
-        }
+    private JdbcTemplate jdbcTemplate;
+    
+    private Class<T> entityClass;
+    
+    @SuppressWarnings("unchecked")
+    public BaseJdbcDao() {
+    	ParameterizedType type = (ParameterizedType) getClass().getGenericSuperclass();
+    	entityClass = (Class<T>) type.getActualTypeArguments()[0];
     }
-
+    
+    
     /**
      * <B>取得：</B>JDBC调用模板<BR>
      * 
@@ -69,25 +61,6 @@ public class BaseJdbcDao {
         return jdbcTemplate;
     }
 
-    /**
-     * <B>取得：</B>启动时间<BR>
-     * 
-     * @return Date 启动时间
-     */
-    public Date getStartTime() {
-        return startTime;
-    }
-
-    /**
-     * 
-     * <B>方法名称：</B>获取数据库的当前时间<BR>
-     * <B>概要说明：</B><BR>
-     * 
-     * @return Date 当前时间
-     */
-    public Date getCurrentTime() {
-        return this.getJdbcTemplate().queryForObject("SELECT SYSTIMESTAMP FROM DUAL", Date.class);
-    }
 
     /**
      * <B>方法名称：</B>查询JSON列表<BR>
@@ -97,8 +70,24 @@ public class BaseJdbcDao {
      * @param args 参数
      * @return List<JSONObject> JSON列表
      */
-    public List<JSONObject> queryForJsonList(String sql, Object... args) {
-        return this.jdbcTemplate.query(sql, JSON_ROW_MAPPER, args);
+    public List<JSONObject> queryForJsonList(String sql, List<Object> args) {
+    	log.info("=======数据库查询语句：{}=========",sql);
+    	if (args != null) {
+    		log.info("=======数据库查询参数：{}=========",args.toString());
+		}
+        return this.jdbcTemplate.query(sql, JSON_ROW_MAPPER, args.toArray());
+    }
+    
+    /**
+     * 返回的是泛型对应的类 
+     */
+    public List<T> queryTList(String sql, List<Object> args) {
+    	RowMapper<T> rowMapper = BeanPropertyRowMapper.newInstance(entityClass);
+    	log.info("=======数据库查询语句：{}=========",sql);
+    	if (args != null) {
+    		log.info("=======数据库查询参数：{}=========",args.toString());
+		}
+        return this.jdbcTemplate.query(sql, rowMapper, args.toArray());
     }
 
     /**
@@ -109,8 +98,19 @@ public class BaseJdbcDao {
      * @param args 参数
      * @return JSONObject JSON数据
      */
-    public JSONObject queryForJsonObject(String sql, Object... args) {
+    public JSONObject queryForJsonObject(String sql, List<Object> args) {
         List<JSONObject> jsonList = queryForJsonList(sql, args);
+        if (jsonList == null || jsonList.size() < 1) {
+            return null;
+        }
+        return jsonList.get(0);
+    }
+    
+    /**
+     * 返回的是泛型对应的类 
+     */
+    public T queryTObject(String sql, List<Object> args) {
+        List<T> jsonList = queryTList(sql, args);
         if (jsonList == null || jsonList.size() < 1) {
             return null;
         }
@@ -125,12 +125,112 @@ public class BaseJdbcDao {
      * @param args 参数
      * @return String 文本
      */
-    public String queryForString(String sql, Object... args) {
-        List<String> dataList = this.jdbcTemplate.queryForList(sql, args, String.class);
+    public String queryForString(String sql, List<Object> args) {
+    	log.info("=======数据库查询语句：{}=========",sql);
+    	log.info("=======数据库查询参数：{}=========",args.toString());
+        List<String> dataList = this.jdbcTemplate.queryForList(sql, args.toArray(), String.class);
         if (dataList == null || dataList.size() < 1) {
             return null;
         }
         return dataList.get(0);
+    }
+    
+    /**
+     * 按照条件查询 
+     */
+    public List<JSONObject> queryJsonObjectByPara(String sqlPara,JSONObject para,String order){
+    	StringBuffer sql = new StringBuffer(sqlPara);
+    	List<Object> sqlArgs = new ArrayList<Object>();
+        if (para != null) {
+         	sql.append(" WHERE ");
+         	Set<Entry<String, Object>> set = para.entrySet();
+         	for (Iterator<Entry<String, Object>> iterator = set.iterator(); iterator.hasNext();) {
+     			Entry<String, Object> entry = (Entry<String, Object>) iterator.next();
+     			sql.append(entry.getKey() + "=? AND ");
+     			sqlArgs.add(entry.getValue());
+     		}
+            sql.delete(sql.length() - 4, sql.length());
+ 		}
+        if (StringUtils.isNotEmpty(order)) {
+        	sql.append(" ORDER BY ").append(order);
+		}
+        return queryForJsonList(sql.toString(), sqlArgs);
+    }
+    
+    /**
+     * 按照条件查询 
+     */
+    public List<T> queryTByPara(String sqlPara,JSONObject para,String order){
+    	StringBuffer sql = new StringBuffer(sqlPara);
+    	List<Object> sqlArgs = new ArrayList<Object>();
+        if (para != null) {
+         	sql.append(" WHERE ");
+         	Set<Entry<String, Object>> set = para.entrySet();
+         	for (Iterator<Entry<String, Object>> iterator = set.iterator(); iterator.hasNext();) {
+     			Entry<String, Object> entry = (Entry<String, Object>) iterator.next();
+     			sql.append(entry.getKey() + "=? AND ");
+     			sqlArgs.add(entry.getValue());
+     		}
+            sql.delete(sql.length() - 4, sql.length());
+ 		}
+        if (StringUtils.isNotEmpty(order)) {
+        	sql.append(" ORDER BY ").append(order);
+		}
+        return queryTList(sql.toString(), sqlArgs);
+    }
+    
+    /**
+     * 按照条件分页查询 
+     */
+    public Page<T> queryJsonObjectByPage(String sqlPara,JSONObject para,Page<T> page,String order,String tableName){
+    	StringBuffer sql = new StringBuffer(sqlPara);
+    	List<Object> sqlArgs = new ArrayList<Object>();
+        if (para != null) {
+         	sql.append(" WHERE ");
+         	Set<Entry<String, Object>> set = para.entrySet();
+         	for (Iterator<Entry<String, Object>> iterator = set.iterator(); iterator.hasNext();) {
+     			Entry<String, Object> entry = (Entry<String, Object>) iterator.next();
+     			sql.append(entry.getKey() + "=? AND ");
+     			sqlArgs.add(entry.getValue());
+     		}
+             sql.delete(sql.length() - 4, sql.length());
+ 		}
+        if (StringUtils.isNotEmpty(order)) {
+        	sql.append(" ORDER BY ").append(order);
+		} 
+        page.setTotalSize(queryObjCount(tableName, para));
+        sql.append(" LIMIT ?,? ");
+        sqlArgs.add(page.getStartSize());
+        sqlArgs.add(page.getPageSize());
+        page.setResultList(queryTList(sql.toString(), sqlArgs));
+        return page;
+    }
+    
+    
+    
+    /**
+     * 查询记录数 
+     */
+    public int queryObjCount(String tableName,JSONObject para) {
+    	StringBuffer sql = new StringBuffer();
+        sql.append(" SELECT COUNT(1) FROM ").append(tableName);
+        List<Object> sqlArgs = new ArrayList<Object>();
+        if (para != null) {
+        	sql.append(" WHERE ");
+        	Set<Entry<String, Object>> set = para.entrySet();
+        	for (Iterator<Entry<String, Object>> iterator = set.iterator(); iterator.hasNext();) {
+    			Entry<String, Object> entry = (Entry<String, Object>) iterator.next();
+    			sql.append(entry.getKey() + "=? AND ");
+    			sqlArgs.add(entry.getValue());
+    		}
+            sql.delete(sql.length() - 4, sql.length());
+		}
+        log.info("=======数据库查询语句：{}=========",sql);
+        if (sqlArgs != null) {
+    		log.info("=======数据库查询参数：{}=========",sqlArgs.toString());
+		}
+        int count = this.getJdbcTemplate().queryForObject(sql.toString(), sqlArgs.toArray(), Integer.class);
+        return count;
     }
 
     /**
@@ -145,31 +245,6 @@ public class BaseJdbcDao {
         sql.insert(0, "SELECT * FROM (SELECT PAGE_VIEW.*, ROWNUM AS ROW_SEQ_NO FROM (");
         sql.append(") PAGE_VIEW WHERE ROWNUM <= " + (start + limit));
         sql.append(") WHERE ROW_SEQ_NO > " + start);
-    }
-
-    /**
-     * <B>方法名称：</B>拼接管理机构子查询语句<BR>
-     * <B>概要说明：</B><BR>
-     * 
-     * @param sql SQL语句
-     * @param params 参数列表
-     * @param orgId 管理机构标识
-     */
-    public void appendOrgSubQuerySql(StringBuffer sql, List<Object> params, String orgId) {
-        sql.append("SELECT ORG_ID FROM MST_ORG_REF WHERE PARENT_ID = ?");
-        params.add(orgId);
-    }
-
-    /**
-     * <B>方法名称：</B>获取唯一键值<BR>
-     * <B>概要说明：</B><BR>
-     * @return String 唯一键值
-     */
-    public String generateKey() {
-        String sql = "SELECT '0000' || TO_CHAR(SYSTIMESTAMP, 'YYYYMMDD') FROM DUAL ";
-        String pre = this.getJdbcTemplate().queryForObject(sql, String.class);
-        String uid = UUID.randomUUID().toString().replaceAll("-", "").toUpperCase();
-        return pre + uid.substring(12);
     }
 
     /**
@@ -196,84 +271,7 @@ public class BaseJdbcDao {
         }
     }
 
-    /**
-     * <B>方法名称：</B>适应SQL列名<BR>
-     * <B>概要说明：</B><BR>
-     * 
-     * @param c 原列名
-     * @return String 调整后列名
-     */
-    public static String c(String c) {
-        if (StringUtils.isBlank(c)) {
-            return null;
-        }
-        return c.trim().toUpperCase();
-    }
 
-    /**
-     * <B>方法名称：</B>适应SQL参数<BR>
-     * <B>概要说明：</B>防止SQL注入问题<BR>
-     * 
-     * @param v 参数
-     * @return String 调整后参数
-     */
-    public static String v(String v) {
-        if (StringUtils.isBlank(v)) {
-            return null;
-        }
-        return v.trim().replaceAll("'", "''");
-    }
-
-    /**
-     * <B>方法名称：</B>获取日期文本值<BR>
-     * <B>概要说明：</B><BR>
-     * 
-     * @param rs 结果集
-     * @param column 列名
-     * @return String 文本值
-     * @throws SQLException SQL异常错误
-     */
-    protected String getDate(ResultSet rs, String column) throws SQLException {
-        Date date = rs.getDate(column);
-        if (date == null) {
-            return null;
-        }
-        return DateFormatUtils.format(date, Const.FORMAT_DATE);
-    }
-
-    /**
-     * <B>方法名称：</B>获取日期时间文本值<BR>
-     * <B>概要说明：</B><BR>
-     * 
-     * @param rs 结果集
-     * @param column 列名
-     * @return String 文本值
-     * @throws SQLException SQL异常错误
-     */
-    protected String getDateTime(ResultSet rs, String column) throws SQLException {
-        Date date = rs.getDate(column);
-        if (date == null) {
-            return null;
-        }
-        return DateFormatUtils.format(date, Const.FORMAT_DATETIME);
-    }
-
-    /**
-     * <B>方法名称：</B>获取时间戳文本值<BR>
-     * <B>概要说明：</B><BR>
-     * 
-     * @param rs 结果集
-     * @param column 列名
-     * @return String 文本值
-     * @throws SQLException SQL异常错误
-     */
-    protected String getTimestamp(ResultSet rs, String column) throws SQLException {
-        Date date = rs.getDate(column);
-        if (date == null) {
-            return null;
-        }
-        return DateFormatUtils.format(date, Const.FORMAT_TIMESTAMP);
-    }
     
     /**
      * <B>方法名称：</B>单表INSERT方法<BR>
@@ -307,7 +305,10 @@ public class BaseJdbcDao {
         
         sql.delete(sql.length() - 1, sql.length());
         sql.append(" ) ");
-        
+        log.info("=======数据库新增语句：{}=========",sql);
+        if (sqlArgs != null) {
+        	log.info("=======数据库新增参数：{}=========",sqlArgs.toString());
+		}
         return this.getJdbcTemplate().update(sql.toString(), sqlArgs.toArray()); 
     }
     
@@ -361,5 +362,112 @@ public class BaseJdbcDao {
       });
     } 
     
+    /**
+     * 更新操作
+     */
+    protected int update(String tableName, JSONObject filed,JSONObject condition) {
+        StringBuffer sql = new StringBuffer();
+        sql.append(" UPDATE ");
+        sql.append(tableName + " SET ");
+    	
+    	Set<Entry<String, Object>> set = filed.entrySet();
+    	List<Object> sqlArgs = new ArrayList<Object>();
+    	for (Iterator<Entry<String, Object>> iterator = set.iterator(); iterator.hasNext();) {
+			Entry<String, Object> entry = (Entry<String, Object>) iterator.next();
+			sql.append(entry.getKey() + "=?,");
+			sqlArgs.add(entry.getValue());
+		}
+
+        sql.delete(sql.length() - 1, sql.length());
+        if (condition != null) {
+        	sql.append(" WHERE ");
+        	Set<Entry<String, Object>> conditionSet = condition.entrySet();
+        	for (Iterator<Entry<String, Object>> iterator = conditionSet.iterator(); iterator.hasNext();) {
+    			Entry<String, Object> entry = (Entry<String, Object>) iterator.next();
+    			sql.append(entry.getKey() + "=? AND ");
+    			sqlArgs.add(entry.getValue());
+    		}
+        	sql.delete(sql.length() - 4, sql.length());
+		}
+        log.info("=======数据库修改语句：{}=========",sql);
+        if (sqlArgs != null) {
+        	log.info("=======数据库修改参数：{}=========",sqlArgs.toString());
+		}
+        return this.getJdbcTemplate().update(sql.toString(), sqlArgs.toArray()); 
+    }
     
+    protected void updateBatch(String tableName, final List<LinkedHashMap<String, Object>> list,final List<LinkedHashMap<String, Object>> paraList) {
+        
+        if (list.size() <= 0) {
+            return;
+        }
+        
+        LinkedHashMap<String, Object> linkedHashMap = list.get(0);
+        
+        StringBuffer sql = new StringBuffer();
+        sql.append(" UPDATE ");
+        sql.append(tableName + " SET ");
+        
+        final String[] keyset =  (String[]) linkedHashMap.keySet().toArray(new String[linkedHashMap.size()]);
+        
+        for (int i = 0; i < linkedHashMap.size(); i++) {
+            sql.append(keyset[i] + "=?,");
+        }
+        
+        sql.delete(sql.length() - 1, sql.length());
+        
+        if (paraList != null && paraList.size() > 0) {
+        	sql.append(" WHERE ");
+        	LinkedHashMap<String, Object> paraLinkedHashMap = paraList.get(0);
+        	final String[] paraKeyset =  (String[]) paraLinkedHashMap.keySet().toArray(new String[linkedHashMap.size()]);
+        	for (int i = 0; i < paraLinkedHashMap.size(); i++) {
+    			sql.append(paraKeyset[i] + "=? AND ");
+    		}
+        	sql.delete(sql.length() - 4, sql.length());
+		}
+        
+        this.getJdbcTemplate().batchUpdate(sql.toString(), new BatchPreparedStatementSetter() {
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                LinkedHashMap<String, Object>  map = list.get(i);
+                Object[] valueset = map.values().toArray(new Object[map.size()]);
+                int len = map.keySet().size();
+                for (int j = 0; j < len; j++) {
+                    ps.setObject(j + 1, valueset[j]);
+                }
+                LinkedHashMap<String, Object> paraMap = paraList.get(i);
+                Object[] paraValueset = paraMap.values().toArray(new Object[paraMap.size()]);
+                int paralen = paraMap.keySet().size();
+                for (int j = len; j < len+paralen; j++) {
+                    ps.setObject(j + 1, paraValueset[j]);
+                }
+            }
+            public int getBatchSize() {
+                return list.size();
+            }
+      });
+    }
+    
+    /**
+     * 删除 
+     */
+    public int deletObj(String tableName,JSONObject para) {
+    	StringBuffer sql = new StringBuffer();
+        sql.append(" DELETE * FROM ").append(tableName);
+        List<Object> sqlArgs = new ArrayList<Object>();
+        if (para != null) {
+        	sql.append(" WHERE ");
+        	Set<Entry<String, Object>> set = para.entrySet();
+        	for (Iterator<Entry<String, Object>> iterator = set.iterator(); iterator.hasNext();) {
+    			Entry<String, Object> entry = (Entry<String, Object>) iterator.next();
+    			sql.append(entry.getKey() + "=? AND ");
+    			sqlArgs.add(entry.getValue());
+    		}
+            sql.delete(sql.length() - 4, sql.length());
+		}
+        log.info("=======数据库删除语句：{}=========",sql);
+        if (sqlArgs != null) {
+        	log.info("=======数据库删除参数：{}=========",sqlArgs.toString());
+		}
+        return this.getJdbcTemplate().update(sql.toString(), sqlArgs.toArray());
+    }
 }

@@ -123,6 +123,26 @@ public class RedisConnectionUtil {
 	}
 	
 	/**
+	 * 删除字符型 
+	 */
+	public boolean delValue(String key) {
+		Jedis jedis = getJedis();
+		boolean result = false;
+		try {
+			long results = jedis.del(key);
+			if (results == 1) {
+				result = true;
+			}
+		} catch (Exception e) {
+			destroyRource(jedis);
+			e.printStackTrace();
+		}finally {
+			returnJedis(jedis);
+		}
+		return result;
+	}
+	
+	/**
 	 * hash列表  
 	 * @param key：哈希表名  field:key值
 	 * redis返回值为 1 设置成功  0失败

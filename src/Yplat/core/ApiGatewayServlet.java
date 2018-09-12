@@ -1,5 +1,6 @@
 package Yplat.core;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
@@ -25,7 +26,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Date;
 
 /**
  * Created by Administrator on 2018/1/20.
@@ -126,13 +126,16 @@ public class ApiGatewayServlet extends HttpServlet {
 						errorMsg = ((SystemException) e).getErrMsg();
 					}else {
 						errorCode = SystemTrans.CD_SYS_ERROR;
-						errorMsg = e.getMessage();
+						errorMsg = e.getLocalizedMessage();
+					}
+					if (StringUtils.isEmpty(errorMsg)) {
+						errorMsg = "系统开了个小差，请稍后再试！";
 					}
 					ResponseDataHandle responseDataHandle = ResponseDataHandle.getInstance();
 					responseDataHandle.buildErrorData(errorCode, errorMsg, content);
 				}finally {
 					asyncCtx.complete();
-					logger.info("#########本次请求的接口代号为：{}，请求时长：{}毫秒############",content.getApiRunnable()==null?"无代号":content.getApiRunnable().apiName,Duration.between(startTime, Instant.now()).toMillis());
+					logger.info("#########线程{}处理完成本次请求，本次请求的接口代号为：{}，请求时长：{}毫秒############",Thread.currentThread().getName(),content.getApiRunnable()==null?"无代号":content.getApiRunnable().apiName,Duration.between(startTime, Instant.now()).toMillis());
 				}
 			}
 		});
